@@ -1,0 +1,22 @@
+[package]
+name = "bot"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1.24.2", features = ["macros", "rt-multi-thread", "full"] }
+tracing-subscriber = "0.3.15"
+matrix-sdk = "0.6.0"
+dotenv = "0.15.0"
+candle-core = { git = "https://github.com/huggingface/candle.git", version = "0.4.2" }
+reqwest = { version = "0.11", features = ["json"] }
+client_ollama = { path = "src/client_ollama" }
+serde_json = "1.0" 
+
+[[bin]]  # Esta sección especifica que src/bot/main.rs es un binario
+name = "bot"
+path = "src/bot/main.rs"
