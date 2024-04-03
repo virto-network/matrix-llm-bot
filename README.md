@@ -18,3 +18,4 @@ In the coming days, I will be adding new actions to the code, including:
   <li> Commands where the bot can respond to various queries.</li>
   <li> The ability to fetch and update the latest news from the Kusama community and governance. This feature can be configured to update once a day, once a week, or on demand (specific timing is yet to be defined).</li>
 </ul>
+
