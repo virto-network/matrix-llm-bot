@@ -1,19 +1,22 @@
-use std::sync::Arc;
-
 use matrix_sdk::{
     config::SyncSettings, room::Room, ruma::{events::room::{member::StrippedRoomMemberEvent, message::{MessageType, OriginalSyncRoomMessageEvent, RoomMessageEventContent}}, user_id
-          }, Client
+          }
 };
+use matrix_sdk::Client as MatrixClient;
 use tokio::time::{sleep, Duration};
 use dotenv::dotenv;
 
-extern crate client_ollama;
-use client_ollama::LLMClient;
+use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest};
+use openai_api_rs::v1::common::GPT4;
+use openai_api_rs::v1::api::Client as OpenAIClient;
+
+// extern crate client_ollama;
+// use client_ollama::LLMClient;
 
 // Async function that awaits for an invitation and accepts it automatically
 async fn handle_room_invitation(
     room_member: StrippedRoomMemberEvent,
-    client: Client,
+    client: MatrixClient,
     room: Room,
 ) {
     if room_member.state_key != client.user_id().unwrap() {
@@ -44,9 +47,9 @@ async fn handle_room_invitation(
     }
 }
 
-pub fn init_client(base_url: &str) -> LLMClient {
-    LLMClient::new(base_url)
-}
+// pub fn init_client(base_url: &str) -> LLMClient {
+//     LLMClient::new(base_url)
+// }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -55,27 +58,26 @@ async fn main() -> anyhow::Result<()> {
     let password = std::env::var("PASSWORD").expect("PASSWORD must be set.");
 
     let bot_user = user_id!("@virto_bot:matrix.org");
-    let client = Client::builder().server_name(bot_user.server_name()).build().await?;
-    let llm_client = Arc::new(init_client("http://localhost:5000"));
+    let matrix_client = MatrixClient::builder().server_name(bot_user.server_name()).build().await?;
+    // let llm_client = Arc::new(init_client("http://localhost:5000"));
  
     // First we need to log in.
-    client.login_username(bot_user, &password).send().await?;
+    matrix_client.login_username(bot_user, &password).send().await?;
     // We add an event handler that listens if our user is invited to a room
     // This event_handler should be different: it has to listen every time a guest joins and invite it into a new room where you can talk with the bot.
-    client.add_event_handler(handle_room_invitation);
+    matrix_client.add_event_handler(handle_room_invitation);
     // We add an event handler that listens if our user is invited to a room
-    client.add_event_handler(move |ev: OriginalSyncRoomMessageEvent, room: Room| {
-        let llm_client = llm_client.clone();
+    matrix_client.add_event_handler(move |ev: OriginalSyncRoomMessageEvent, room: Room| {
         
         async move {
-            if let Err(e) = on_room_message(ev, room, llm_client).await {
+            if let Err(e) = on_room_message(ev, room).await {
                 eprintln!("Error processing message: {}", e);
             }
         }
     });
     
     //This event handler listens and prints every message it's received
-     client.add_event_handler(|ev: OriginalSyncRoomMessageEvent| async move {
+    matrix_client.add_event_handler(|ev: OriginalSyncRoomMessageEvent| async move {
         if ev.sender != user_id!("@virto_bot:matrix.org") { 
             println!("Received a message {:?}", ev); 
         }   
@@ -83,13 +85,13 @@ async fn main() -> anyhow::Result<()> {
 
     // Syncing is important to synchronize the client state with the server.
     // This method will never return unless there is an error.
-    client.sync(SyncSettings::default()).await?;
+    matrix_client.sync(SyncSettings::default()).await?;
 
     Ok(())
 }
 
 // Async function that gets the text content of a room and answers. 
-async fn on_room_message(event: OriginalSyncRoomMessageEvent, room: Room, llm_client: Arc<LLMClient>) -> Result<(), Box<dyn std::error::Error>> {
+async fn on_room_message(event: OriginalSyncRoomMessageEvent, room: Room) -> Result<(), Box<dyn std::error::Error>> {
     let room = match room {
         Room::Joined(room) => room,
         _ => return Ok(()), // For now we ignore messages unrelated with rooms.
@@ -109,19 +111,42 @@ async fn on_room_message(event: OriginalSyncRoomMessageEvent, room: Room, llm_cl
     // We check that the message we will process is the user message.
     let user_message = text_content.body.clone();
     println!("THis is the USER MESSAGE {}", user_message);
-    let mut llm_response = String::new();
+
+    let openai_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set.");
+    let openai_client = OpenAIClient::new(openai_key);
+
+    let req = ChatCompletionRequest::new(
+        GPT4.to_string(),
+        vec![chat_completion::ChatCompletionMessage {
+            role: chat_completion::MessageRole::user,
+            content: chat_completion::Content::Text(user_message),
+            name: None,
+        }],
+    );
+
+    println!("{:?}", req);
+    let result: chat_completion::ChatCompletionResponse = openai_client.chat_completion(req)?;
+    println!("Content: {:?}", result.choices[0].message.content);
+    println!("Response Headers: {:?}", result.headers);
+    
+    // let mut llm_response = String::new();
 
     // Call to the LLM client
-    match llm_client.get_chat_completion("", &user_message).await {
-        Ok(response) => llm_response = response,
-        Err(err) => {
-            eprintln!("Error procesando la solicitud a LLM: {}", err);
-            llm_response = "Error al contactar al servicio de lenguaje".to_string();
-        }
-    }
+    // match llm_client.get_chat_completion("", &user_message).await {
+    //     Ok(response) => llm_response = response,
+    //     Err(err) => {
+    //         eprintln!("Error procesando la solicitud a LLM: {}", err);
+    //         llm_response = "Error al contactar al servicio de lenguaje".to_string();
+    //     }
+    // }
 
     // Send response to matrix
-    let content = RoomMessageEventContent::text_plain(&llm_response);
+    // let content = match &result.choices[0].message.content {
+    //     Some(text) => RoomMessageEventContent::text_plain(text),
+    //     None => RoomMessageEventContent::text_plain("Error: Respuesta vacía de la IA"), // Mensaje de error por si no hay contenido
+    // };
+
+    let content: RoomMessageEventContent = RoomMessageEventContent::text_plain(result.choices[0].message.content);
     room.send(content, None).await?; 
 
     Ok(())
