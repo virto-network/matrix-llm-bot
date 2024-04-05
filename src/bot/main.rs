@@ -5,13 +5,9 @@ use matrix_sdk::{
 use matrix_sdk::Client as MatrixClient;
 use tokio::time::{sleep, Duration};
 use dotenv::dotenv;
-
+use std::fs;
 use openai_api_rs::v1::chat_completion::{self, ChatCompletionRequest};
-use openai_api_rs::v1::common::GPT4;
 use openai_api_rs::v1::api::Client as OpenAIClient;
-
-// extern crate client_ollama;
-// use client_ollama::LLMClient;
 
 // Async function that awaits for an invitation and accepts it automatically
 async fn handle_room_invitation(
@@ -47,10 +43,6 @@ async fn handle_room_invitation(
     }
 }
 
-// pub fn init_client(base_url: &str) -> LLMClient {
-//     LLMClient::new(base_url)
-// }
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenv().ok();
@@ -59,7 +51,6 @@ async fn main() -> anyhow::Result<()> {
 
     let bot_user = user_id!("@virto_bot:matrix.org");
     let matrix_client = MatrixClient::builder().server_name(bot_user.server_name()).build().await?;
-    // let llm_client = Arc::new(init_client("http://localhost:5000"));
  
     // First we need to log in.
     matrix_client.login_username(bot_user, &password).send().await?;
@@ -115,39 +106,35 @@ async fn on_room_message(event: OriginalSyncRoomMessageEvent, room: Room) -> Res
     let openai_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set.");
     let openai_client = OpenAIClient::new(openai_key);
 
+    //Processing file
+    let file_content = fs::read_to_string("src/bot/virto.md").unwrap();
+
+    let prompt = format!("Información del archivo: {}\nMensaje del usuario: {}", file_content, user_message);
+
     let req = ChatCompletionRequest::new(
-        GPT4.to_string(),
+        "gpt-4-0125-preview".into(),
         vec![chat_completion::ChatCompletionMessage {
             role: chat_completion::MessageRole::user,
-            content: chat_completion::Content::Text(user_message),
+            content: chat_completion::Content::Text(prompt),
             name: None,
         }],
-    );
+    )
+    .max_tokens(4096);
 
     println!("{:?}", req);
     let result: chat_completion::ChatCompletionResponse = openai_client.chat_completion(req)?;
     println!("Content: {:?}", result.choices[0].message.content);
     println!("Response Headers: {:?}", result.headers);
     
-    // let mut llm_response = String::new();
+    let choice = result.choices.get(0).ok_or("No se ha encontrado un mensaje en este indice.")?;
 
-    // Call to the LLM client
-    // match llm_client.get_chat_completion("", &user_message).await {
-    //     Ok(response) => llm_response = response,
-    //     Err(err) => {
-    //         eprintln!("Error procesando la solicitud a LLM: {}", err);
-    //         llm_response = "Error al contactar al servicio de lenguaje".to_string();
-    //     }
-    // }
+    let Some(my_string) = choice.message.content.to_owned()
+     else {
+        return Err("El modelo no ha contestado.".into());
+    };
 
-    // Send response to matrix
-    // let content = match &result.choices[0].message.content {
-    //     Some(text) => RoomMessageEventContent::text_plain(text),
-    //     None => RoomMessageEventContent::text_plain("Error: Respuesta vacía de la IA"), // Mensaje de error por si no hay contenido
-    // };
-
-    let content: RoomMessageEventContent = RoomMessageEventContent::text_plain(result.choices[0].message.content);
-    room.send(content, None).await?; 
+    let content = RoomMessageEventContent::text_plain(my_string);
+    room.send(content, None).await?;
 
     Ok(())
 }
