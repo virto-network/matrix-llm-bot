@@ -9,15 +9,43 @@ edition = "2021"
 anyhow = "1"
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1.24.2", features = ["macros", "rt-multi-thread", "full"] }
-tracing-subscriber = "0.3.15"
 matrix-sdk = "0.6.0"
-dotenv = "0.15.0"
 candle-core = { git = "https://github.com/huggingface/candle.git", version = "0.4.2" }
 reqwest = { version = "0.11", features = ["json"] }
 client_ollama = { path = "src/client_ollama" }
 serde_json = "1.0"
 openai-api-rs = "4.0.8"
 
-[[bin]]  # Esta sección especifica que src/bot/main.rs es un binario
+actix-web = "4.0.0"
+config = "0.13"
+serde-aux = "3"
+
+uuid = { version = "0.8.1", features = ["v4"] }
+chrono = "0.4.31"
+log = "0.4"
+tracing = { version = "0.1", features = ["log"] }
+tracing-subscriber = { version = "0.3", features = ["registry", "env-filter"] }
+tracing-bunyan-formatter = "0.3"
+tracing-log = "0.1"
+tracing-actix-web = "0.5"
+thiserror = "1"
+
+[dependencies.sqlx]
+version = "0.5.7"
+default-features = false
+features = [
+    "runtime-actix-rustls",
+    "macros",
+    "sqlite",
+    "uuid",
+    "chrono",
+    "migrate"
+]
+
+[lib]
+name = "bot"
+path = "src/bot/lib.rs"
+
+[[bin]] # Esta sección especifica que src/bot/main.rs es un binario
 name = "bot"
 path = "src/bot/main.rs"

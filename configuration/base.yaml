@@ -1,0 +1,9 @@
+application:
+  port: 8000
+database: 
+  host: "localhost"
+  port: 5432
+  database_name: "bot"
+matrix: 
+  username: "@virto_bot:matrix.org"
+  password: ${MATRIX_BOT_PASSWORD}
