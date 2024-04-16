@@ -1,8 +1,7 @@
+use std::str::FromStr;
+
 use serde_aux::field_attributes::deserialize_number_from_string;
-use sqlx::{
-    sqlite::SqliteConnectOptions,
-    ConnectOptions,
-};
+use sqlx::sqlite::SqliteConnectOptions;
 
 #[derive(serde::Deserialize, Debug, Clone)]
 pub struct Settings {
@@ -22,8 +21,6 @@ pub struct ApplicationSettings {
 #[derive(serde::Deserialize, Debug, Clone)]
 pub struct DatabaseSettings {
     #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub port: u16,
-    pub host: String,
     pub database_name: String,
 }
 
@@ -92,15 +89,13 @@ impl TryFrom<String> for Environment {
 
 impl DatabaseSettings {
     pub fn with_db(&self) -> SqliteConnectOptions {
-        let mut options = self.without_db().database(&self.database_name);
 
-        options.log_statements(tracing::log::LevelFilter::Trace);
-        options
+    let conn = SqliteConnectOptions::from_str("sqlite:///Users/ailenrgrimaldi/matrix-llm-bot/rooms.db").expect("No se conectó el archivo de la base de datos.");
+
+    conn
     }
 
     pub fn without_db(&self) -> SqliteConnectOptions {
         SqliteConnectOptions::new()
-            .host(&self.host) //aca me pierdo un poco
-            .port(self.port)
     }
 }

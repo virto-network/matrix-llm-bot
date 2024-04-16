@@ -1,8 +1,8 @@
 -- Add migration script here
 -- Add migration script here
-CREATE TABLE IF NOT EXISTS rooms (
-    id INTEGER PRIMARY KEY,
+CREATE TABLE rooms (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     room_id TEXT NOT NULL,
-    available INTEGER NOT NULL DEFAULT 1, 
+    available INTEGER NOT NULL DEFAULT 1,
     created_at DATETIME DEFAULT (datetime('now', 'localtime'))
 )

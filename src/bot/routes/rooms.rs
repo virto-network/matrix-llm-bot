@@ -1,7 +1,6 @@
 use actix_web::ResponseError;
 use actix_web::{web, HttpResponse, Responder};
 use anyhow::{Context, Error};
-use chrono::Utc;
 use matrix_sdk::ruma::{OwnedRoomId, OwnedUserId, RoomId};
 use matrix_sdk::ruma::UserId;
 use matrix_sdk::ruma::{
@@ -21,7 +20,6 @@ use reqwest::StatusCode;
 use sqlx::SqlitePool;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Sender;
-use uuid::Uuid;
 
 use crate::domain::RoomInvite;
 use crate::utils::error_chain_fmt;
@@ -144,12 +142,9 @@ impl std::fmt::Debug for StoreRoomError {
 pub async fn store_room(db_client: &SqlitePool, room_id: &str) -> Result<(), StoreRoomError> {
     sqlx::query!(
         r#"
-            INSERT INTO rooms (id, room_id, available, created_at) VALUES ($1, $2, $3, $4)
+            INSERT INTO rooms (room_id) VALUES ($1)
         "#,
-        Uuid::new_v4(),
         room_id,
-        true,
-        Utc::now()
     )
     .execute(db_client)
     .await
@@ -198,10 +193,10 @@ pub async fn on_handle_next_room(db_client: &SqlitePool) -> Result<String, anyho
 }
 
 #[tracing::instrument(name = "Count rooms from database", skip(db_client))]
-pub async fn count_rooms(db_client: &SqlitePool) -> Result<i64, anyhow::Error> {
+pub async fn count_rooms(db_client: &SqlitePool) -> Result<i32, anyhow::Error> {
     let result = sqlx::query!(
         r#"
-            SELECT Count(room_id) 
+            SELECT COUNT(*) AS count
             FROM rooms
             WHERE available = true
         "#
@@ -214,7 +209,7 @@ pub async fn count_rooms(db_client: &SqlitePool) -> Result<i64, anyhow::Error> {
         e
     })?;
 
-    let count  = result.unwrap();
+    let count  = result;
 
     Ok(count)
 }

@@ -17,7 +17,7 @@ if ! [ -x "$(command -v sqlx)" ]; then
 fi
 
 DB_NAME="${SQLITE_DB:=rooms.db}"
-
+echo "${DB_NAME}"
 sqlite3 "${DB_NAME}"
 
 export DATABASE_URL="sqlite:${DB_NAME}"
