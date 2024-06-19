@@ -17,10 +17,14 @@ use reqwest::StatusCode;
 use ruma::api::client::state::get_state_events_for_key;
 use ruma::events::macros::EventContent;
 use ruma::events::room::avatar::RoomAvatarEventContent;
-use ruma::OwnedMxcUri;
+use ruma::{OwnedMxcUri, RoomAliasId};
 use serde::{Deserialize, Serialize};
 use crate::domain::{CommunityData, CommunityMatrixId, Uri};
 use crate::utils::{error_chain_fmt, mxc_to_download_uri};
+
+const SERVER: &str = "virto.community";
+const EXPECTED_BYTES: usize = 32;
+const SLUG_LEN: usize = EXPECTED_BYTES - 1 - 1 - SERVER.len() - 2; // EXPECTED_BYTES - '#' - ':' - SERVER - OFFSET
 
 #[derive(thiserror::Error)]
 pub enum ServerError {
@@ -120,12 +124,29 @@ pub async fn on_handle_create_room(
     content.room_type = Some(ruma::room::RoomType::Space);
 
     request.creation_content = Some(Raw::new(&content)?);
+    
+    let slug = name_to_slug(&room.name);
+    let mut offset = String::new();
+
+    while let Ok(_) = get_by_alias_from_matrix(&format!("#{}{}:{}", slug, offset, SERVER), matrix_client).await {
+        let mut offset_number = offset.parse::<u8>().unwrap_or(0);
+        offset_number += 1u8;
+        offset = offset_number.to_string();
+    }
+    let slug = format!("{}{}", slug, offset);
+    request.room_alias_name = Some(&slug);
 
     let response = matrix_client.create_room(request).await?;
     
     tracing::Span::current().record("room_id", &tracing::field::display(&response.room_id));
 
-    Ok(response.room_id.to_string())
+    let request = ruma::api::client::space::get_hierarchy::v1::Request::new(&response.room_id);
+    let response = matrix_client.send(request, None).await?;
+
+    let response = response.rooms.get(0).ok_or(anyhow::anyhow!("Room not found"))?.clone();
+    let alias = response.canonical_alias.ok_or(anyhow::anyhow!("Room not found"))?.clone();
+
+    Ok(alias.to_string())
 }
 
 #[tracing::instrument(
@@ -155,6 +176,27 @@ async fn upload_to_matrix(buffer: &[u8], matrix_client: &MatrixClient) -> Result
     let response = matrix_client.media().upload(&mime::IMAGE_JPEG, buffer).await?;
 
     Ok(response.content_uri.to_string())
+}
+
+#[tracing::instrument(
+    name = "Get community metadata", 
+    skip(path, matrix_client) 
+)]
+pub async fn get_by_alias(path: web::Path<String>, matrix_client: web::Data<MatrixClient>) -> Result<impl Responder, ServerError> {
+    let id = path.into_inner();
+    let response = get_by_alias_from_matrix(&id, &matrix_client).await?;
+    let response = get_by_id_from_matrix(&response, &matrix_client).await?;
+
+    Ok(web::Json(response))
+}
+
+#[tracing::instrument(name = "Get a space from matrix", skip(alias, matrix_client))]
+async fn get_by_alias_from_matrix(alias: &str, matrix_client: &MatrixClient) -> Result<String, Error> {
+    let alias = RoomAliasId::parse(alias)?;
+
+    let request = ruma::api::client::alias::get_alias::v3::Request::new(&alias);
+    let response = matrix_client.send(request, None).await?;
+    Ok(response.room_id.to_string())
 }
 
 #[tracing::instrument(
@@ -199,3 +241,21 @@ async fn get_by_id_from_matrix(id: &str, matrix_client: &MatrixClient) -> Result
     Ok(community)
 }
 
+
+fn name_to_slug(name: &str) -> String {
+    let filtered: String = name.chars().filter_map(|c| {
+        match c {
+            ' ' => Some('_'),
+            _ if c.is_ascii_alphanumeric() => Some(c),
+            _ => None,
+        }
+    }).collect();
+
+    let filtered = if filtered.len() > SLUG_LEN {
+        filtered[..SLUG_LEN].to_string()
+    } else {
+        filtered
+    };
+
+    filtered
+}
