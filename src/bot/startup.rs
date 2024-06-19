@@ -7,7 +7,7 @@ use tracing_actix_web::TracingLogger;
 
 use crate::{
     configuration::Settings,
-    routes::{create, get_by_id, health_check, upload},
+    routes::{create, get_by_alias, get_by_id, health_check, upload},
 };
 
 pub struct Application {
@@ -66,7 +66,8 @@ fn run(
             .wrap(cors)
             .route("/health_check", web::get().to(health_check))
             .route("/room/upload", web::post().to(upload))
-            .route("/room/{id}", web::get().to(get_by_id))
+            .route("/room/alias/{id}", web::get().to(get_by_alias))
+            .route("/room/id/{id}", web::get().to(get_by_id))
             .route("/room/create", web::post().to(create))
             .app_data(matrix.clone())
     })
