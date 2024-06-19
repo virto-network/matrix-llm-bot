@@ -7,19 +7,14 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1"
-serde = { version = "1.0", features = ["derive"] }
-tokio = { version = "1.24.2", features = ["macros", "rt-multi-thread", "full"] }
+serde = { version = "1", features = ["derive"]}
+tokio = { version = "1.36.0", features = ["macros", "rt-multi-thread", "full"] }
 matrix-sdk = "0.6.0"
-candle-core = { git = "https://github.com/huggingface/candle.git", version = "0.4.2" }
 reqwest = { version = "0.11", features = ["json"] }
-client_ollama = { path = "src/client_ollama" }
 serde_json = "1.0"
-openai-api-rs = "4.0.8"
-
 actix-web = "4.0.0"
 config = "0.13"
 serde-aux = "3"
-
 log = "0.4"
 tracing = { version = "0.1", features = ["log"] }
 tracing-subscriber = { version = "0.3", features = ["registry", "env-filter"] }
@@ -37,7 +32,7 @@ ruma = { version = "0.7.4", features = [
 actix-multipart = "0.6.1"
 futures-util = "0.3.30"
 mime = "0.3.17"
-actix-cors = "0.7.0"
+actix-cors = "0.6.0"
 
 [lib]
 name = "bot"
