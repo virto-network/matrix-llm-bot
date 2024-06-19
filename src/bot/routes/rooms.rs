@@ -22,9 +22,9 @@ use serde::{Deserialize, Serialize};
 use crate::domain::{CommunityData, CommunityMatrixId, Uri};
 use crate::utils::{error_chain_fmt, mxc_to_download_uri};
 
-static SERVER: &str = "virto.community";
-static EXPECTED_BYTES: usize = 32;
-static SLUG_LEN: usize = EXPECTED_BYTES - 1usize - 1usize - SERVER.len() - 2usize; // EXPECTED_BYTES - '#' - ':' - SERVER - OFFSET
+const SERVER: &str = "virto.community";
+const EXPECTED_BYTES: usize = 32;
+const SLUG_LEN: usize = EXPECTED_BYTES - 1 - 1 - SERVER.len() - 2; // EXPECTED_BYTES - '#' - ':' - SERVER - OFFSET
 
 #[derive(thiserror::Error)]
 pub enum ServerError {
@@ -246,7 +246,7 @@ fn name_to_slug(name: &str) -> String {
     let filtered: String = name.chars().filter_map(|c| {
         match c {
             ' ' => Some('_'),
-            _ if c.is_alphabetic() => Some(c),
+            _ if c.is_ascii_alphanumeric() => Some(c),
             _ => None,
         }
     }).collect();
