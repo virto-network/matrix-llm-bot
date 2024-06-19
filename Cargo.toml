@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1"
-serde = { version = "1", features = ["derive"]}
+serde = { version = "1", features = ["derive"] }
 tokio = { version = "1.36.0", features = ["macros", "rt-multi-thread", "full"] }
 matrix-sdk = "0.6.0"
 reqwest = { version = "0.11", features = ["json"] }
