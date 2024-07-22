@@ -15,14 +15,10 @@ async fn main() -> anyhow::Result<()> {
 
     let matrix_client = login(&configuration.matrix).await?;
 
-    matrix_client.sync_once(SyncSettings::default()).await?;
-
+    let _ = matrix_client.sync_once(SyncSettings::default()).await;
+    
     let application = Application::build(configuration, &matrix_client).await?;
     application.run_until_stopped().await?;
-
-    // Syncing is important to synchronize the client state with the server.
-    // This method will never return unless there is an error.
-    matrix_client.sync(SyncSettings::default()).await?;
 
     Ok(())
 }
