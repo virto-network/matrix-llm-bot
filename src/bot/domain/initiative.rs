@@ -25,11 +25,25 @@ pub struct RemoveMembersAction {
     pub members: Members,
 }
 
+#[derive(PartialEq, Clone, Default, Deserialize, Serialize, Debug)]
+pub struct KusamaTreasury {
+    pub date: String,
+    pub amount: u64,
+}
+
+pub type KusamaTreasuryPeriods = Vec<KusamaTreasury>;
+
+#[derive(PartialEq, Clone, Debug, Deserialize, Serialize, Default)]
+pub struct KusamaTreasuryAction {
+    pub periods: KusamaTreasuryPeriods,
+}
+
 #[derive(PartialEq, Deserialize, Serialize, Clone, Debug)]
 #[serde(tag = "action_type")]
 pub enum ActionItem {
     AddMembers(AddMembersAction),
     RemoveMembers(RemoveMembersAction),
+    KusamaTreasury(KusamaTreasuryAction),
 }
 
 #[derive(PartialEq, Clone, Debug, Deserialize, Serialize, EventContent, Default)]

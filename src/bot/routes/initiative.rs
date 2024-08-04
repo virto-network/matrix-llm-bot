@@ -15,7 +15,7 @@ use ruma::api::client::filter::{LazyLoadOptions, RoomEventFilter};
 use ruma::api::client::room::Visibility;
 use ruma::events::OriginalSyncMessageLikeEvent;
 use ruma::{assign, RoomId};
-use serde_json::Value;
+use serde_json::{to_string_pretty, Value};
 use crate::domain::{CommunityMatrixId, InitiativeData, InitiativeHistory, InitiativeInfoContent, InitiativeInitContent, InitiativeVoteContent, InitiativeVoteData };
 use crate::utils::error_chain_fmt;
 
@@ -91,14 +91,14 @@ pub async fn on_handle_create_initiative_room(
                 let _ = on_handle_init_initiative_message(InitiativeInitContent {
                     sender: data.init.sender.clone(),
                     is_admin: data.init.is_admin
-                }, room.clone()).await;
+                }, room.clone()).await?;
 
                 let _ = on_handle_info_initiative_message(InitiativeInfoContent { 
                     name: data.info.name, 
                     description: data.info.description, 
                     tags: data.info.tags,
                     actions: data.info.actions 
-                }, room).await;
+                }, room).await?;
                 break;
             },
             None => {
