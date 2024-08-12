@@ -15,7 +15,7 @@ use ruma::api::client::filter::{LazyLoadOptions, RoomEventFilter};
 use ruma::api::client::room::Visibility;
 use ruma::events::OriginalSyncMessageLikeEvent;
 use ruma::{assign, RoomId};
-use serde_json::{to_string_pretty, Value};
+use serde_json::Value;
 use crate::domain::{CommunityMatrixId, InitiativeData, InitiativeHistory, InitiativeInfoContent, InitiativeInitContent, InitiativeVoteContent, InitiativeVoteData };
 use crate::utils::error_chain_fmt;
 

@@ -38,12 +38,65 @@ pub struct KusamaTreasuryAction {
     pub periods: KusamaTreasuryPeriods,
 }
 
+#[derive(PartialEq, Clone, Default, Deserialize, Serialize, Debug)]
+pub enum ConvictionVote {
+    #[default]
+    None,
+    Locked1x,
+    Locked2x,
+    Locked3x,
+    Locked4x,
+    Locked5x,
+    Locked6x,
+}
+
+#[derive(PartialEq, Clone, Debug, Deserialize, Serialize, Default)]
+pub struct StandardVote {
+    pub aye: bool,
+    pub conviction: ConvictionVote,
+    pub balance: u64,
+}
+
+#[derive(PartialEq, Clone, Debug, Deserialize, Serialize, Default)]
+pub struct SplitVote {
+    pub aye: u64,
+    pub nay: u64,
+}
+
+#[derive(PartialEq, Clone, Debug, Deserialize, Serialize, Default)]
+pub struct SplitAbstainVote {
+    pub aye: u64,
+    pub nay: u64,
+    pub abstain: u64,
+}
+
+#[derive(PartialEq, Clone, Deserialize, Serialize, Debug)]
+pub enum VoteType {
+    Standard(StandardVote),
+    Split(SplitVote),
+    SplitAbstain(SplitAbstainVote),
+}
+
+#[derive(PartialEq, Clone, Deserialize, Serialize, Debug)]
+pub struct VotingOpenGov {
+    pub poll_index: u64,
+    pub vote: VoteType,
+}
+
+pub type VotingOpenGovActionProposals = Vec<VotingOpenGov>;
+
+#[derive(PartialEq, Clone, Debug, Deserialize, Serialize, Default)]
+pub struct VotingOpenGovAction {
+    pub proposals: VotingOpenGovActionProposals,
+}
+
 #[derive(PartialEq, Deserialize, Serialize, Clone, Debug)]
 #[serde(tag = "action_type")]
 pub enum ActionItem {
     AddMembers(AddMembersAction),
     RemoveMembers(RemoveMembersAction),
     KusamaTreasury(KusamaTreasuryAction),
+    VotingOpenGov(VotingOpenGovAction),
 }
 
 #[derive(PartialEq, Clone, Debug, Deserialize, Serialize, EventContent, Default)]
