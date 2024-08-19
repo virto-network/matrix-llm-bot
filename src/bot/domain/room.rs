@@ -22,6 +22,5 @@ pub struct GetCommunity {
 
 #[derive(Serialize)]
 pub struct Uri {
-    pub uri: String
+    pub uri: String,
 }
-

@@ -22,9 +22,8 @@ pub struct MatrixSettings {
 
 #[derive(serde::Deserialize, Debug, Clone)]
 pub struct CorsSettings {
-    pub origin: String,
+    pub origin: Vec<String>,
 }
-
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
     let base_path = std::env::current_dir().expect("Failed to determine the current directory");

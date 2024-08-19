@@ -1,3 +1,5 @@
+use crate::domain::{CommunityData, CommunityMatrixId, Uri};
+use crate::utils::{error_chain_fmt, mxc_to_download_uri};
 use actix_multipart::Multipart;
 use actix_web::ResponseError;
 use actix_web::{web, Responder};
@@ -7,9 +9,7 @@ use matrix_sdk::ruma::api::client::room::create_room::v3::CreationContent;
 use matrix_sdk::ruma::RoomId;
 use matrix_sdk::ruma::{
     api::{self},
-    events::{
-        AnyInitialStateEvent, EmptyStateKey, InitialStateEvent,
-    },
+    events::{AnyInitialStateEvent, EmptyStateKey, InitialStateEvent},
     serde::Raw,
 };
 use matrix_sdk::Client as MatrixClient;
@@ -19,8 +19,6 @@ use ruma::events::macros::EventContent;
 use ruma::events::room::avatar::RoomAvatarEventContent;
 use ruma::{OwnedMxcUri, RoomAliasId};
 use serde::{Deserialize, Serialize};
-use crate::domain::{CommunityData, CommunityMatrixId, Uri};
-use crate::utils::{error_chain_fmt, mxc_to_download_uri};
 
 const SERVER: &str = "virto.community";
 const EXPECTED_BYTES: usize = 32;
@@ -63,13 +61,11 @@ pub async fn create(
     form: web::Json<CommunityData>,
     matrix_client: web::Data<MatrixClient>,
 ) -> Result<impl Responder, ServerError> {
-    let response = on_handle_create_room(form.0,&matrix_client)
+    let response = on_handle_create_room(form.0, &matrix_client)
         .await
         .context("Failed to create a room")?;
 
-    Ok(web::Json(CommunityMatrixId {
-        id: response
-    }))
+    Ok(web::Json(CommunityMatrixId { id: response }))
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, EventContent)]
@@ -80,7 +76,7 @@ pub struct IndustryEventContent {
 
 #[tracing::instrument(name = "Create a room", skip(matrix_client))]
 pub async fn on_handle_create_room(
-    room: CommunityData, 
+    room: CommunityData,
     matrix_client: &MatrixClient,
 ) -> Result<String, Error> {
     let mut request = api::client::room::create_room::v3::Request::new();
@@ -124,11 +120,13 @@ pub async fn on_handle_create_room(
     content.room_type = Some(ruma::room::RoomType::Space);
 
     request.creation_content = Some(Raw::new(&content)?);
-    
+
     let slug = name_to_slug(&room.name);
     let mut offset = String::new();
 
-    while let Ok(_) = get_by_alias_from_matrix(&format!("#{}{}:{}", slug, offset, SERVER), matrix_client).await {
+    while let Ok(_) =
+        get_by_alias_from_matrix(&format!("#{}{}:{}", slug, offset, SERVER), matrix_client).await
+    {
         let mut offset_number = offset.parse::<u8>().unwrap_or(0);
         offset_number += 1u8;
         offset = offset_number.to_string();
@@ -137,52 +135,62 @@ pub async fn on_handle_create_room(
     request.room_alias_name = Some(&slug);
 
     let response = matrix_client.create_room(request).await?;
-    
+
     tracing::Span::current().record("room_id", &tracing::field::display(&response.room_id));
 
     let request = ruma::api::client::space::get_hierarchy::v1::Request::new(&response.room_id);
     let response = matrix_client.send(request, None).await?;
 
-    let response = response.rooms.get(0).ok_or(anyhow::anyhow!("Room not found"))?.clone();
-    let alias = response.canonical_alias.ok_or(anyhow::anyhow!("Room not found"))?.clone();
+    let response = response
+        .rooms
+        .get(0)
+        .ok_or(anyhow::anyhow!("Room not found"))?
+        .clone();
+    let alias = response
+        .canonical_alias
+        .ok_or(anyhow::anyhow!("Room not found"))?
+        .clone();
 
     Ok(alias.to_string())
 }
 
-#[tracing::instrument(
-    name = "Upload a file", 
-    skip(payload, matrix_client) 
-)]
-pub async fn upload(mut payload: Multipart, matrix_client: web::Data<MatrixClient>) -> Result<impl Responder, ServerError> {
+#[tracing::instrument(name = "Upload a file", skip(payload, matrix_client))]
+pub async fn upload(
+    mut payload: Multipart,
+    matrix_client: web::Data<MatrixClient>,
+) -> Result<impl Responder, ServerError> {
     let mut buffer = Vec::new();
 
     if let Some(field) = payload.next().await {
-        let mut field = field.map_err(|_| ServerError::ValidationError("File not found".to_string()))?;
+        let mut field =
+            field.map_err(|_| ServerError::ValidationError("File not found".to_string()))?;
         while let Some(chunk) = field.next().await {
-            let data = chunk.map_err(|_| ServerError::ValidationError("File not found".to_string()))?;
+            let data =
+                chunk.map_err(|_| ServerError::ValidationError("File not found".to_string()))?;
             buffer.extend_from_slice(&data);
         }
     }
 
     let response = upload_to_matrix(&buffer, &matrix_client).await?;
 
-    Ok(web::Json(Uri {
-        uri: response
-    }))
+    Ok(web::Json(Uri { uri: response }))
 }
 
 #[tracing::instrument(name = "Upload a file to matrix", skip(buffer, matrix_client))]
 async fn upload_to_matrix(buffer: &[u8], matrix_client: &MatrixClient) -> Result<String, Error> {
-    let response = matrix_client.media().upload(&mime::IMAGE_JPEG, buffer).await?;
+    let response = matrix_client
+        .media()
+        .upload(&mime::IMAGE_JPEG, buffer)
+        .await?;
 
     Ok(response.content_uri.to_string())
 }
 
-#[tracing::instrument(
-    name = "Get community metadata", 
-    skip(path, matrix_client) 
-)]
-pub async fn get_by_alias(path: web::Path<String>, matrix_client: web::Data<MatrixClient>) -> Result<impl Responder, ServerError> {
+#[tracing::instrument(name = "Get community metadata", skip(path, matrix_client))]
+pub async fn get_by_alias(
+    path: web::Path<String>,
+    matrix_client: web::Data<MatrixClient>,
+) -> Result<impl Responder, ServerError> {
     let id = path.into_inner();
     let response = get_by_alias_from_matrix(&id, &matrix_client).await?;
     let response = get_by_id_from_matrix(&response, &matrix_client).await?;
@@ -191,7 +199,10 @@ pub async fn get_by_alias(path: web::Path<String>, matrix_client: web::Data<Matr
 }
 
 #[tracing::instrument(name = "Get a space from matrix", skip(alias, matrix_client))]
-async fn get_by_alias_from_matrix(alias: &str, matrix_client: &MatrixClient) -> Result<String, Error> {
+async fn get_by_alias_from_matrix(
+    alias: &str,
+    matrix_client: &MatrixClient,
+) -> Result<String, Error> {
     let alias = RoomAliasId::parse(alias)?;
 
     let request = ruma::api::client::alias::get_alias::v3::Request::new(&alias);
@@ -199,11 +210,11 @@ async fn get_by_alias_from_matrix(alias: &str, matrix_client: &MatrixClient) -> 
     Ok(response.room_id.to_string())
 }
 
-#[tracing::instrument(
-    name = "Get community metadata", 
-    skip(path, matrix_client) 
-)]
-pub async fn get_by_id(path: web::Path<String>, matrix_client: web::Data<MatrixClient>) -> Result<impl Responder, ServerError> {
+#[tracing::instrument(name = "Get community metadata", skip(path, matrix_client))]
+pub async fn get_by_id(
+    path: web::Path<String>,
+    matrix_client: web::Data<MatrixClient>,
+) -> Result<impl Responder, ServerError> {
     let id = path.into_inner();
     let response = get_by_id_from_matrix(&id, &matrix_client).await?;
 
@@ -211,45 +222,56 @@ pub async fn get_by_id(path: web::Path<String>, matrix_client: web::Data<MatrixC
 }
 
 #[tracing::instrument(name = "Get a space from matrix", skip(id, matrix_client))]
-async fn get_by_id_from_matrix(id: &str, matrix_client: &MatrixClient) -> Result<CommunityData, Error> {
+async fn get_by_id_from_matrix(
+    id: &str,
+    matrix_client: &MatrixClient,
+) -> Result<CommunityData, Error> {
     let room = RoomId::parse(id)?;
     let request = ruma::api::client::space::get_hierarchy::v1::Request::new(&room);
     let response = matrix_client.send(request, None).await?;
 
-    let response = response.rooms.get(0).ok_or(anyhow::anyhow!("Room not found"))?.clone();
+    let response = response
+        .rooms
+        .get(0)
+        .ok_or(anyhow::anyhow!("Room not found"))?
+        .clone();
 
     let name = response.name.unwrap_or("".to_string());
-    let logo = response.avatar_url.and_then(|uri| mxc_to_download_uri(&uri));
+    let logo = response
+        .avatar_url
+        .and_then(|uri| mxc_to_download_uri(&uri));
     let description = response.topic;
 
     let state_key = "".to_string();
-    let request = get_state_events_for_key::v3::Request::new(
-        &room,
-        "m.virto.industry".into(),
-        &state_key,
-    );
+    let request =
+        get_state_events_for_key::v3::Request::new(&room, "m.virto.industry".into(), &state_key);
 
     let response = matrix_client.send(request, None).await?;
     let event = response.content;
     let event_json = serde_json::to_string(&event)?;
     let custom_event: IndustryEventContent = serde_json::from_str(&event_json)?;
-    
+
     let industry = custom_event.industry_name;
 
-    let community = CommunityData { name, logo, description, industry };
+    let community = CommunityData {
+        name,
+        logo,
+        description,
+        industry,
+    };
 
     Ok(community)
 }
 
-
 fn name_to_slug(name: &str) -> String {
-    let filtered: String = name.chars().filter_map(|c| {
-        match c {
+    let filtered: String = name
+        .chars()
+        .filter_map(|c| match c {
             ' ' => Some('_'),
             _ if c.is_ascii_alphanumeric() => Some(c),
             _ => None,
-        }
-    }).collect();
+        })
+        .collect();
 
     let filtered = if filtered.len() > SLUG_LEN {
         filtered[..SLUG_LEN].to_string()

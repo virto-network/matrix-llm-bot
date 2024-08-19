@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
     let matrix_client = login(&configuration.matrix).await?;
 
     let _ = matrix_client.sync_once(SyncSettings::default()).await;
-    
+
     let application = Application::build(configuration, &matrix_client).await?;
     application.run_until_stopped().await?;
 

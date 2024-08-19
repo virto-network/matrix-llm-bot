@@ -7,7 +7,10 @@ use tracing_actix_web::TracingLogger;
 
 use crate::{
     configuration::Settings,
-    routes::{cast_vote, create, create_initiative, get_by_alias, get_by_id, get_initiative_by_id, health_check, upload},
+    routes::{
+        cast_vote, create, create_initiative, get_by_alias, get_by_id, get_initiative_by_id,
+        health_check, upload,
+    },
 };
 
 pub struct Application {
@@ -48,14 +51,17 @@ impl Application {
 
 fn run(
     listener: TcpListener,
-    origin: String,
+    origin: Vec<String>,
     matrix_client: MatrixClient,
 ) -> anyhow::Result<Server, anyhow::Error> {
     let matrix: web::Data<MatrixClient> = web::Data::new(matrix_client.clone());
 
     let server = HttpServer::new(move || {
-        let cors = Cors::default()
-            .allowed_origin(&origin)
+        let cors = origin
+            .iter()
+            .fold(Cors::default(), |acc, origin| acc.allowed_origin(&origin));
+
+        let cors = cors
             .allowed_methods(vec!["GET", "POST"])
             .allowed_headers(vec![http::header::AUTHORIZATION, http::header::ACCEPT])
             .allowed_header(http::header::CONTENT_TYPE)
