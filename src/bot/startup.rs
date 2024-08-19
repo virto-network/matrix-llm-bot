@@ -7,10 +7,7 @@ use tracing_actix_web::TracingLogger;
 
 use crate::{
     configuration::Settings,
-    routes::{
-        cast_vote, create, create_initiative, get_by_alias, get_by_id, get_initiative_by_id,
-        health_check, upload,
-    },
+    routes::{cast_vote, create, create_initiative, get_by_alias, get_by_id, get_initiative_by_id, health_check, upload},
 };
 
 pub struct Application {

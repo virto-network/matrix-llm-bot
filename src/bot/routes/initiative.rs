@@ -1,8 +1,3 @@
-use crate::domain::{
-    CommunityMatrixId, InitiativeData, InitiativeHistory, InitiativeInfoContent,
-    InitiativeInitContent, InitiativeVoteContent, InitiativeVoteData,
-};
-use crate::utils::error_chain_fmt;
 use actix_web::ResponseError;
 use actix_web::{web, Responder};
 use anyhow::{Context, Error};
@@ -20,7 +15,9 @@ use ruma::api::client::filter::{LazyLoadOptions, RoomEventFilter};
 use ruma::api::client::room::Visibility;
 use ruma::events::OriginalSyncMessageLikeEvent;
 use ruma::{assign, RoomId};
-use serde_json::{to_string_pretty, Value};
+use serde_json::Value;
+use crate::domain::{CommunityMatrixId, InitiativeData, InitiativeHistory, InitiativeInfoContent, InitiativeInitContent, InitiativeVoteContent, InitiativeVoteData };
+use crate::utils::error_chain_fmt;
 
 #[derive(thiserror::Error)]
 pub enum ServerError {
@@ -59,16 +56,18 @@ pub async fn create_initiative(
     form: web::Json<InitiativeData>,
     matrix_client: web::Data<MatrixClient>,
 ) -> Result<impl Responder, ServerError> {
-    let response = on_handle_create_initiative_room(form.0, &matrix_client)
+    let response = on_handle_create_initiative_room(form.0,&matrix_client)
         .await
         .context("Failed to create initiative a room")?;
 
-    Ok(web::Json(CommunityMatrixId { id: response }))
+    Ok(web::Json(CommunityMatrixId {
+        id: response
+    }))
 }
 
 #[tracing::instrument(name = "create a initiative room", skip(matrix_client))]
 pub async fn on_handle_create_initiative_room(
-    data: InitiativeData,
+    data: InitiativeData, 
     matrix_client: &MatrixClient,
 ) -> Result<String, Error> {
     let mut request = api::client::room::create_room::v3::Request::new();
@@ -84,39 +83,27 @@ pub async fn on_handle_create_initiative_room(
     let response = matrix_client.create_room(request).await?;
 
     let _ = matrix_client.sync_once(SyncSettings::default()).await;
-
+    
     loop {
         match matrix_client.get_joined_room(&response.room_id) {
             Some(room) => {
-                tracing::Span::current().record(
-                    "Room is now available in the client state.",
-                    response.room_id.to_string(),
-                );
-                let _ = on_handle_init_initiative_message(
-                    InitiativeInitContent {
-                        sender: data.init.sender.clone(),
-                        is_admin: data.init.is_admin,
-                    },
-                    room.clone(),
-                )
-                .await?;
+                tracing::Span::current().record("Room is now available in the client state.", response.room_id.to_string());
+                let _ = on_handle_init_initiative_message(InitiativeInitContent {
+                    sender: data.init.sender.clone(),
+                    is_admin: data.init.is_admin
+                }, room.clone()).await?;
 
-                let _ = on_handle_info_initiative_message(
-                    InitiativeInfoContent {
-                        name: data.info.name,
-                        description: data.info.description,
-                        tags: data.info.tags,
-                        actions: data.info.actions,
-                    },
-                    room,
-                )
-                .await?;
+                let _ = on_handle_info_initiative_message(InitiativeInfoContent { 
+                    name: data.info.name, 
+                    description: data.info.description, 
+                    tags: data.info.tags,
+                    actions: data.info.actions 
+                }, room).await?;
                 break;
-            }
+            },
             None => {
                 let _ = matrix_client.sync_once(SyncSettings::default()).await;
-                tracing::Span::current()
-                    .record("Room not found after sync.", response.room_id.to_string());
+                tracing::Span::current().record("Room not found after sync.", response.room_id.to_string());
             }
         }
     }
@@ -126,29 +113,32 @@ pub async fn on_handle_create_initiative_room(
 
 #[tracing::instrument(name = "init a initiative message", skip(room))]
 pub async fn on_handle_init_initiative_message(
-    data: InitiativeInitContent,
+    data: InitiativeInitContent, 
     room: Joined,
 ) -> Result<(), Error> {
     let content = serde_json::to_value(data)?;
-    room.send_raw(content, "m.virto.initiative_init", None)
-        .await?;
+    room.send_raw(content, "m.virto.initiative_init", None).await?;
 
     Ok(())
 }
 
 #[tracing::instrument(name = "place info initiative message", skip(room))]
 pub async fn on_handle_info_initiative_message(
-    data: InitiativeInfoContent,
+    data: InitiativeInfoContent, 
     room: Joined,
 ) -> Result<(), Error> {
     let content = serde_json::to_value(data)?;
-    room.send_raw(content, "m.virto.initiative_info", None)
-        .await?;
+    room.send_raw(content, "m.virto.initiative_info", None).await?;
 
     Ok(())
 }
 
-#[tracing::instrument(name = "Task to cast a vote", skip(form))]
+#[tracing::instrument(
+    name = "Task to cast a vote", 
+    skip(
+        form
+    ),
+)]
 pub async fn cast_vote(
     form: web::Json<InitiativeVoteData>,
     matrix_client: web::Data<MatrixClient>,
@@ -166,25 +156,22 @@ pub async fn on_handle_vote_initiative_message(
     matrix_client: &MatrixClient,
 ) -> Result<(), Error> {
     let room = RoomId::parse(data.room)?;
-    let room = matrix_client
-        .get_joined_room(&room)
-        .ok_or(anyhow::anyhow!("Room not found"))?;
+    let room = matrix_client.get_joined_room(&room).ok_or(anyhow::anyhow!("Room not found"))?;
 
     let content = serde_json::to_value(InitiativeVoteContent {
         user: data.user,
-        vote: data.vote,
+        vote: data.vote
     })?;
-    room.send_raw(content, "m.virto.initiative_vote", None)
-        .await?;
+    room.send_raw(content, "m.virto.initiative_vote", None).await?;
 
     Ok(())
 }
 
-#[tracing::instrument(name = "Get initiative metadata", skip(path, matrix_client))]
-pub async fn get_initiative_by_id(
-    path: web::Path<String>,
-    matrix_client: web::Data<MatrixClient>,
-) -> Result<impl Responder, ServerError> {
+#[tracing::instrument(
+    name = "Get initiative metadata", 
+    skip(path, matrix_client) 
+)]
+pub async fn get_initiative_by_id(path: web::Path<String>, matrix_client: web::Data<MatrixClient>) -> Result<impl Responder, ServerError> {
     let id = path.into_inner();
     let response = get_by_id_from_matrix(&id, &matrix_client).await?;
 
@@ -192,10 +179,7 @@ pub async fn get_initiative_by_id(
 }
 
 #[tracing::instrument(name = "Get a space from matrix", skip(id, matrix_client))]
-async fn get_by_id_from_matrix(
-    id: &str,
-    matrix_client: &MatrixClient,
-) -> Result<InitiativeHistory, Error> {
+async fn get_by_id_from_matrix(id: &str, matrix_client: &MatrixClient) -> Result<InitiativeHistory, Error> {
     let room_id = RoomId::parse(id)?;
 
     let room = matrix_client
@@ -247,7 +231,8 @@ async fn get_by_id_from_matrix(
         {
             initiative_history.info = event.content;
         };
-    }
 
+    }
+    
     Ok(initiative_history)
 }
