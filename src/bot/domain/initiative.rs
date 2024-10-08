@@ -90,6 +90,17 @@ pub struct VotingOpenGovAction {
     pub proposals: VotingOpenGovActionProposals,
 }
 
+#[derive(PartialEq, Clone, Default, Deserialize, Serialize, Debug)]
+pub struct TransferItem {
+    pub account: String,
+    pub value: u64
+}
+pub type Transfers = Vec<TransferItem>;
+#[derive(PartialEq, Clone, Debug, Deserialize, Serialize, Default)]
+pub struct CommunityTransferAction {
+    pub transfers: Transfers,
+}
+
 #[derive(PartialEq, Deserialize, Serialize, Clone, Debug)]
 #[serde(tag = "action_type")]
 pub enum ActionItem {
@@ -97,6 +108,7 @@ pub enum ActionItem {
     RemoveMembers(RemoveMembersAction),
     KusamaTreasury(KusamaTreasuryAction),
     VotingOpenGov(VotingOpenGovAction),
+    CommunityTransfer(CommunityTransferAction),
 }
 
 #[derive(PartialEq, Clone, Debug, Deserialize, Serialize, EventContent, Default)]
