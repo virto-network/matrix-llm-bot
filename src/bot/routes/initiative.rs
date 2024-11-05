@@ -14,7 +14,7 @@ use reqwest::StatusCode;
 use ruma::api::client::filter::{LazyLoadOptions, RoomEventFilter};
 use ruma::api::client::room::Visibility;
 use ruma::events::OriginalSyncMessageLikeEvent;
-use ruma::{assign, RoomId};
+use ruma::{assign, RoomId, UInt};
 use serde_json::Value;
 use crate::domain::{CommunityMatrixId, InitiativeData, InitiativeHistory, InitiativeInfoContent, InitiativeInitContent, InitiativeVoteContent, InitiativeVoteData };
 use crate::utils::error_chain_fmt;
@@ -190,6 +190,8 @@ async fn get_by_id_from_matrix(id: &str, matrix_client: &MatrixClient) -> Result
         lazy_load_options: LazyLoadOptions::Enabled { include_redundant_members: false },
     });
     let options = assign!(MessagesOptions::backward(), {
+        // Arbitrary events based in the previous initiatives
+        limit: UInt::new(100).expect("should convert into a uint"),
         filter,
         from: None
     });
@@ -211,7 +213,6 @@ async fn get_by_id_from_matrix(id: &str, matrix_client: &MatrixClient) -> Result
         else {
             continue;
         };
-
         if let Ok(event) = serde_json::from_value::<
             OriginalSyncMessageLikeEvent<InitiativeVoteContent>,
         >(value.clone())
